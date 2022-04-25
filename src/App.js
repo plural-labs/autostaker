@@ -11,7 +11,7 @@ import { useState } from 'react';
 import HelpIcon from '@mui/icons-material/Help';
 import axios from 'axios';
 
-const stakebotUrl = "https://autostaker.plural.to"
+const stakebotUrl = "https://stakebot.plural.to"
 
 function App() {
   let theme = createTheme({
