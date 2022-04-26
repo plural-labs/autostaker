@@ -1,17 +1,15 @@
-
-import crystal from './blue_crystal.svg'
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import "@fontsource/roboto"
 import './App.css';
-import { Container, Stack, Button, Link, Select, MenuItem, RadioGroup, Radio, FormControlLabel, OutlinedInput, InputAdornment, Popover} from '@mui/material';
-import { animated, easings, useSpring } from 'react-spring'
+import { Container, Stack, Button, Link, Select, MenuItem } from '@mui/material';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useState } from 'react';
-import HelpIcon from '@mui/icons-material/Help';
 import axios from 'axios';
-
-const stakebotUrl = "https://stakebot.plural.to"
+import { Register } from './components/form'
+import { LoadingPage, BroadcastingPage, ErrorPage, KeplrPage } from './components/dialog'
+import { HoveringCrystal } from './components/animations'
+import { registerAddress, cancelAddress, stakebotUrl } from './chain'
 
 function App() {
   let theme = createTheme({
@@ -56,30 +54,6 @@ function App() {
   );
 }
 
-function HoveringCrystal() {
-  const styles = useSpring({
-    loop: { reverse: true },
-    from: { y: -10 },
-    to: { y: 10 },
-    config: { 
-      duration: 2000,
-      easing: easings.easeInOutQuad,
-    },
-  })
-
-  return (
-    <animated.div
-      style={{
-        width: '35vh',
-        margin: '0 auto',
-        ...styles,
-      }}
-    >
-      <img src={crystal} alt="hovering crystal" className="crystal" />
-    </animated.div>
-  )
-}
-
 function Display() {
   const [firstTime, setFirstTime] = useState(true)
   const [connected, setConnected] = useState(false)
@@ -88,16 +62,21 @@ function Display() {
   const [accounts, setAccounts] = useState([])
   const [accountIdx, setAccountIdx] = useState(0)
   const [status, setStatus] = useState(undefined)
-  const [frequency, setFrequency] = useState(0)
-  const [tolerance, setTolerance] = useState(0)
+  const [broadcasting, setBroadcasting] = useState("")
   const [err, setErr] = useState("")
+
+  // if we have an error display it
   if (err !== "") {
-    return (
-      <div>
-        {err}
-      </div>
-    )
+    return <ErrorPage err={err} />
   }
+
+  // if we are broadcasting a message then signal this
+  // to users.
+  if (broadcasting !== "") {
+    return <BroadcastingPage />
+  }
+
+  // if this is the first time, show the entry display
   if (firstTime) {
     const onClick = () => { setFirstTime(false); }
     return (
@@ -112,21 +91,17 @@ function Display() {
     )
   }
 
-  if (!keplrEnabled()) {
-    return (
-      <div>
-        Must have <Link href="https://www.keplr.app/">Keplr</Link> installed
-      </div>
-    )
+  // check that the user has keplr enabled
+  if (!window.getOfflineSigner || !window.keplr) {
+    
   }
 
+  // query all chain information from the stakebot
   if (chains.length === 0) {
     axios.get(stakebotUrl + "/v1/chains").then((response) => {
       console.log(response);
       if (response.data.length > 0) {
         setChains(response.data)
-        setTolerance(response.data[0].DefaultTolerance)
-        setFrequency(response.data[0].DefaultFrequency)
       } else {
         setErr("no chains found at " + stakebotUrl)
       }
@@ -134,25 +109,23 @@ function Display() {
       setErr(error.message)
     })
   }
-
-
+  
+  // connect to keplr with a chain-id and get the account information
   if (!connected && chains.length > 0) {
     console.log("enabling keplr")
     window.keplr.enable(chains[chainIdx].Id).then(() => {
-      setConnected(true)
+      console.log("getting accounts")
+      const offlineSigner = window.keplr.getOfflineSigner(chains[chainIdx].Id)
+      offlineSigner.getAccounts().then(accs => { 
+        setAccounts(accs)
+        setConnected(true)
+        console.log(accs)
+      }).catch(err => { setErr(err.message)})
     }).catch(() => { setFirstTime(true)})
   }
 
-  if (connected && chains.length > 0 && accounts.length == 0) {
-    console.log("getting accounts")
-    const offlineSigner = window.keplr.getOfflineSigner(chains[chainIdx].Id)
-    offlineSigner.getAccounts().then(accs => { 
-      setAccounts(accs)
-      console.log(accs)
-    }).catch(err => { setErr(err.message)})
-  }
-
-  if (accounts.length > 0 && status === undefined) {
+  // get the status of an account from the stakebot
+  if (connected && accounts.length > 0 && status === undefined) {
     axios.get(stakebotUrl + "/v1/status?address=" + accounts[accountIdx].address).then((response) => {
       console.log(response.data);
       setStatus(response.data)
@@ -161,57 +134,36 @@ function Display() {
     })
   }
 
-  if (!connected || accounts.length === 0 || status === undefined) {
-    return (
-      <div>
-        Loading...
-      </div>
-    )
+  // while waiting for resources we return a loading page
+  if (!connected) {
+    return <LoadingPage />
   }
 
-  const updateTolerance = (event) => {
-    setTolerance(event.target.value)
-  }
+  const chain = chains[chainIdx]
 
-  const updateFrequency = (event) => {
-    setFrequency(parseInt(event.target.value))
-  }
+  // function to register a user
+  const submit = async (frequency, tolerance) => { 
+    const offlineSigner = window.keplr.getOfflineSigner(chains.Id)
 
-  const submit = () => { 
-    alert("Submit")
+    // send the authorization messages and register the address to the stakebot
+    setBroadcasting("Broadcasting authorization messages for " + accounts[accountIdx].address)
+    try {
+      await registerAddress(offlineSigner, chain.RPC, accounts[accountIdx].address, frequency, tolerance)
+    } catch (err) {
+      setErr(err.message)
+    }
+    
+    // get the status of the address from the stakebot now that the address has been registered
+    // This will now trigger the view showing the users status
+    setBroadcasting("Registering " + accounts[accountIdx].address + " to stakebot")
+    axios.get(stakebotUrl + "/v1/status?address=" + accounts[accountIdx].address).then((response) => {
+      console.log(response.data);
+      setStatus(response.data)
+      setBroadcasting("")
+    }).catch((error) => {
+      setErr(error.message)
+    })
   }
-
-  const Info = (
-    <div>
-      <div style={{margin: "25px 0px 15px 0px"}}>
-        Restake Frequency:
-      </div>
-      <RadioGroup
-        row
-        defaultValue={chains[chainIdx].DefaultFrequency}
-        onChange={updateFrequency}
-      >
-        <FormControlLabel value={2} control={<Radio size="small" />} label={<span style={{fontSize: "14px"}}>Every 6 Hours</span>} />
-        <FormControlLabel value={3} control={<Radio size="small" />} label={<span style={{fontSize: "14px"}}>Daily</span>} />
-        <FormControlLabel value={4} control={<Radio size="small" />} label={<span style={{fontSize: "14px"}}>Weekly</span>} />
-        <FormControlLabel value={5} control={<Radio size="small" />} label={<span style={{fontSize: "14px"}}>Monthly</span>} />
-      </RadioGroup>
-      <ToleranceWithHelpIcon />
-      <OutlinedInput
-        value={tolerance}
-        type="number"
-        size="small"
-        endAdornment={<InputAdornment position="end">{chains[chainIdx].NativeDenom}</InputAdornment>} 
-        onChange={updateTolerance}
-      />
-      <br></br>
-      <div style={{ float: "right", padding: "20px"}}>
-        <Button variant="outlined" onClick={submit}>
-          Submit
-        </Button>
-      </div>
-    </div>
-  )
 
   return (
     <div>
@@ -219,11 +171,11 @@ function Display() {
         Chain:
       </div> 
       <Select
-        defaultValue={chains[chainIdx].Id}
+        defaultValue={chain.Id}
       >
-        <MenuItem value={chains[chainIdx].Id}>
+        <MenuItem value={chain.Id}>
           <code>
-            {chains[chainIdx].Id}
+            {chain.Id}
           </code>
         </MenuItem>
       </Select>
@@ -233,61 +185,14 @@ function Display() {
       <code>
         {accounts[0].address}
       </code>
-      {Info}
+      <Register 
+        onSubmit={submit} 
+        defaultFrequency={chain.DefaultFrequency} 
+        defaultTolerance={chain.DefaultTolerance}
+        denom={chain.NativeDenom} 
+      />
     </div>
   )
-}
-
-function keplrEnabled() {
-  return window.getOfflineSigner && window.keplr
-}
-
-function ToleranceWithHelpIcon() {
-  const [anchorEl, setAnchorEl] = useState(null);
-
-  const handlePopoverOpen = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handlePopoverClose = () => {
-    setAnchorEl(null);
-  };
-
-  const open = Boolean(anchorEl);
-
-  return (
-    <div style={{ margin: "15px 0px"}}>
-      <span style={{ marginBottom: "5px"}}>Tolerance</span>
-      <HelpIcon sx={{ paddingLeft: "10px", fontSize: "18px", marginTop: "0px", position: "absolute" }}
-        aria-owns={open ? 'mouse-over-popover' : undefined}
-        aria-haspopup="true"
-        onMouseEnter={handlePopoverOpen}
-        onMouseLeave={handlePopoverClose}
-      />
-      <Popover
-        id="mouse-over-popover"
-        sx={{
-          pointerEvents: 'none',
-        }}
-        open={open}
-        anchorEl={anchorEl}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-        onClose={handlePopoverClose}
-        disableRestoreFocus
-      >
-        <div style={{ padding: "8px"}}>
-          The amount to remain liquid in your account
-        </div>
-      </Popover>
-    </div>
-  );
 }
 
 export default App;
