@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	defaultFilePath = ".autostaker"
+	defaultFilePath = ".autostaker.toml"
 )
 
 func init() {
@@ -35,14 +35,18 @@ var initCmd = &cobra.Command{
 
 		file := filepath.Join(homeDir, defaultFilePath)
 
-		return state.Save(file)
+		if err := state.Save(file); err != nil {
+			return err
+		}
+		c.Printf("Initialized autostaker at %s\n", file)
+		return nil
 	},
 }
 
-func load() (*State, error) {
+func load() (State, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return State{}, err
 	}
 
 	file := filepath.Join(homeDir, defaultFilePath)

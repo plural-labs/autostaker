@@ -43,7 +43,7 @@ func init() {
 			if err != nil {
 				return fmt.Errorf("loading url: %w", err)
 			}
-			url := state.registry
+			url := state.Registry
 
 			if keyringDir == "" {
 				keyringDir, err = os.UserHomeDir()

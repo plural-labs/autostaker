@@ -23,7 +23,7 @@ func init() {
 			if err != nil {
 				return err
 			}
-			addr := state.registry
+			addr := state.Registry
 
 			userAddress, err := sdk.AccAddressFromBech32(args[0])
 			if err != nil {
