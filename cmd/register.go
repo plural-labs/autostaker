@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
 	"time"
 
@@ -34,18 +33,17 @@ func init() {
 		fee            int64
 	)
 	var registerCmd = &cobra.Command{
-		Use:   "register [url] [address]",
+		Use:   "register [address]",
 		Short: "Set up an account with a stakebot",
-		Example: `autostaker register https://autostaker.plural.to
-cosmos147l494tccpk7ecr8vmqc67y542tl90659dgvda 
+		Example: `autostaker register cosmos147l494tccpk7ecr8vmqc67y542tl90659dgvda 
 --app gaia --keyring-backend os --frequency hourly --fee 10`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
-			_, err := url.Parse(args[0])
+			state, err := load()
 			if err != nil {
-				return err
+				return fmt.Errorf("loading url: %w", err)
 			}
-			url := args[0]
+			url := state.registry
 
 			if keyringDir == "" {
 				keyringDir, err = os.UserHomeDir()
@@ -179,26 +177,26 @@ func AuthorizeRestaking(ctx context.Context, c *client.Client, userAddress, botA
 
 	authorizeDelegationsMsg, err := authz.NewMsgGrant(userAddress, botAddress, delegateAuth, inTenYears)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating authorize delegation msg: %w", err)
 	}
 
 	authorizeClaimMsg, err := authz.NewMsgGrant(userAddress, botAddress, claimAuth, inTenYears)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating authorize claim msg: %w", err)
 	}
 
 	allowedMsg, err := feegrant.NewAllowedMsgAllowance(&feegrant.BasicAllowance{SpendLimit: nil, Expiration: &inTenYears}, []string{sdk.MsgTypeURL(&authz.MsgExec{})})
 	if err != nil {
-		return err
+		return fmt.Errorf("creating feegrant allowance: %w", err)
 	}
 	feegrantMsg, err := feegrant.NewMsgGrantAllowance(allowedMsg, userAddress, botAddress)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating feegrant allowance: %w", err)
 	}
 
-	resp, err := c.Send(ctx, []sdk.Msg{authorizeDelegationsMsg, authorizeClaimMsg, feegrantMsg}, client.WithFee(fee))
+	resp, err := c.Send(ctx, []sdk.Msg{authorizeDelegationsMsg, authorizeClaimMsg, feegrantMsg}, client.WithFee(fee), client.WithPubKey())
 	if err != nil {
-		return err
+		return fmt.Errorf("sending restaking msgs: %w", err)
 	}
 
 	if resp.Code != 0 {

@@ -17,9 +17,9 @@ func init() {
 }
 
 var statusCmd = &cobra.Command{
-	Use:   "status [url] [address]",
+	Use:   "status [address]",
 	Short: "Queries the current autostaking status of an address",
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.ExactArgs(1),
 	RunE: func(c *cobra.Command, args []string) error {
 		_, err := url.Parse(args[0])
 		if err != nil {
@@ -52,11 +52,11 @@ var statusCmd = &cobra.Command{
 			return err
 		}
 
-		c.Printf(`Status:
+		c.Printf(`Account Status:
 Address: %s
 Tolerance: %d
 Frequency: %s
-Last Restaked: %s ago
+Last Restaked: %s
 Total Rewards Restaked: %d
 Errors: %s
 `, record.Address, record.Tolerance, types.Frequency_name[int32(record.Frequency)], time.Unix(record.LastUpdatedUnixTime, 0).String(), record.TotalAutostakedRewards, record.ErrorLogs)

@@ -14,18 +14,22 @@ import (
 func init() {
 	var tolerance int64
 	var restakeCmd = &cobra.Command{
-		Use:   "restake [url] [address]",
-		Short: "manually restakes the tokens of a registered address",
-		Example: `autostaker restake https://autostaker.plural.to
-cosmos147l494tccpk7ecr8vmqc67y542tl90659dgvda --tolerance 10000`,
-		Args: cobra.ExactArgs(2),
+		Use:     "restake [address]",
+		Short:   "manually restakes the tokens of a registered address",
+		Example: `autostaker restake cosmos147l494tccpk7ecr8vmqc67y542tl90659dgvda --tolerance 10000`,
+		Args:    cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
-			userAddress, err := sdk.AccAddressFromBech32(args[1])
+			state, err := load()
+			if err != nil {
+				return err
+			}
+			addr := state.registry
+
+			userAddress, err := sdk.AccAddressFromBech32(args[0])
 			if err != nil {
 				return err
 			}
 
-			addr := args[0]
 			if !strings.Contains(addr, "://") {
 				addr = "http://" + addr
 			}
