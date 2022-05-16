@@ -57,20 +57,7 @@ func init() {
 				return err
 			}
 
-			chainsResp, err := http.Get(fmt.Sprintf("%s/v1/chains", url))
-			if err != nil {
-				return err
-			}
-			if chainsResp.StatusCode != 200 {
-				return fmt.Errorf("Received unexpected code %d from url", chainsResp.StatusCode)
-			}
-
-			chainBytes, err := ioutil.ReadAll(chainsResp.Body)
-			if err != nil {
-				return err
-			}
-			var chains types.ChainRegistry
-			err = json.Unmarshal(chainBytes, &chains)
+			chains, err := getChainsFromRegistry(url)
 			if err != nil {
 				return err
 			}
@@ -91,37 +78,13 @@ func init() {
 
 			// check that the key exists
 			if _, err := signer.KeyByAddress(userAddress); err != nil {
-				return err
+				return fmt.Errorf("key by address: %w", err)
 			}
 
-			addressResp, err := http.Get(fmt.Sprintf("%s/v1/address?chain_id=%s", url, chain.Id))
+			botAddress, err := getStakebotAddress(url, chain.Id)
 			if err != nil {
 				return err
 			}
-
-			if addressResp.StatusCode != 200 {
-				return fmt.Errorf("Received unexpected code %d from url with GET /address", chainsResp.StatusCode)
-			}
-
-			addressBytes, err := ioutil.ReadAll(addressResp.Body)
-			if err != nil {
-				return err
-			}
-
-			var address string
-			err = json.Unmarshal(addressBytes, &address)
-			if err != nil {
-				return err
-			}
-
-			_, bz, err = bech32.DecodeAndConvert(address)
-			if err != nil {
-				return err
-			}
-			if err != nil {
-				return fmt.Errorf("Autostaking bot provided incorrect address %s, %w", address, err)
-			}
-			botAddress := sdk.AccAddress(bz)
 
 			c.Printf("Authorizing autostaking bot (%s) with address %s on %s\n", botAddress.String(), userAddress.String(), chain.Id)
 
@@ -206,8 +169,55 @@ func AuthorizeRestaking(ctx context.Context, c *client.Client, userAddress, botA
 	return nil
 }
 
-// TODO: Implement ability to revoke restaking
-func RevokeRestaking(ctx context.Context, client *client.Client, userAddress, botAddress sdk.AccAddress) error {
-	panic("Not Implemented")
-	return nil
+func getChainsFromRegistry(url string) (types.ChainRegistry, error) {
+	chainsResp, err := http.Get(fmt.Sprintf("%s/v1/chains", url))
+	if err != nil {
+		return nil, err
+	}
+	if chainsResp.StatusCode != 200 {
+		return nil, fmt.Errorf("Received unexpected code %d from url", chainsResp.StatusCode)
+	}
+
+	chainBytes, err := ioutil.ReadAll(chainsResp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var chains types.ChainRegistry
+	err = json.Unmarshal(chainBytes, &chains)
+	if err != nil {
+		return nil, err
+	}
+	return chains, nil
+}
+
+func getStakebotAddress(url, chainID string) (sdk.AccAddress, error) {
+	addressResp, err := http.Get(fmt.Sprintf("%s/v1/address?chain_id=%s", url, chainID))
+	if err != nil {
+		return nil, err
+	}
+
+	if addressResp.StatusCode != 200 {
+		return nil, fmt.Errorf("Received unexpected code %d from url with GET /address", addressResp.StatusCode)
+	}
+
+	addressBytes, err := ioutil.ReadAll(addressResp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var address string
+	err = json.Unmarshal(addressBytes, &address)
+	if err != nil {
+		return nil, err
+	}
+
+	_, bz, err := bech32.DecodeAndConvert(address)
+	if err != nil {
+		return nil, err
+	}
+	if err != nil {
+		return nil, fmt.Errorf("Autostaking bot provided incorrect address %s, %w", address, err)
+	}
+
+	return sdk.AccAddress(bz), nil
 }
