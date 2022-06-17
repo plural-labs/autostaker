@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/crypto/keyring"
@@ -119,7 +120,15 @@ func init() {
 
 			c.Printf("Successfully registered %s\n", userAddress.String())
 
-			return nil
+			state.Accounts = append(state.Accounts, userAddress.String())
+
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+
+			file := filepath.Join(homeDir, defaultFilePath)
+			return state.Save(file)
 		},
 	}
 

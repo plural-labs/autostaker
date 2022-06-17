@@ -8,7 +8,8 @@ import (
 )
 
 type State struct {
-	Registry string `toml:"registry"`
+	Registry string   `toml:"registry"`
+	Accounts []string `toml:"accounts"`
 }
 
 func NewState(registry string) State {

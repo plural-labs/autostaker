@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/plural-labs/stakebot/types"
@@ -21,13 +20,13 @@ var statusCmd = &cobra.Command{
 	Short: "Queries the current autostaking status of an address",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(c *cobra.Command, args []string) error {
-		_, err := url.Parse(args[0])
+		state, err := load()
 		if err != nil {
 			return err
 		}
-		url := args[0]
+		url := state.Registry
 
-		resp, err := http.Get(fmt.Sprintf("%s/v1/status?address=%s", url, args[1]))
+		resp, err := http.Get(fmt.Sprintf("%s/v1/status?address=%s", url, args[0]))
 		if err != nil {
 			return err
 		}

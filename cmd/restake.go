@@ -17,7 +17,7 @@ func init() {
 		Use:     "restake [address]",
 		Short:   "manually restakes the tokens of a registered address",
 		Example: `autostaker restake cosmos147l494tccpk7ecr8vmqc67y542tl90659dgvda --tolerance 10000`,
-		Args:    cobra.ExactArgs(2),
+		Args:    cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			state, err := load()
 			if err != nil {
