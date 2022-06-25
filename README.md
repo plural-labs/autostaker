@@ -1,6 +1,6 @@
 # Autostaker
 
-Autostaker is bot a CLI and Frontend for interacting with the [Stakebot](https://github.com/plural-labs/stakebot).
+Autostaker is a client-side CLI for interacting with the [Stakebot](https://github.com/plural-labs/stakebot).
 
 ## Usage
 
